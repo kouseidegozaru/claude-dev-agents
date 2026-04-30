@@ -86,7 +86,14 @@ git commit -m "test: Add failing test reproducing Issue #<N> - <バグの概要>
 7. 既存の全テストも実行して、作成したテスト以外は全て通過することを確認する
 
 ```bash
+# pytest: --ignore はファイルパスも受け付ける
 docker compose run --rm app pytest tests/ -v --ignore=tests/test_bug_<N>.py
+
+# vitest の場合:
+# docker compose run --rm app npx vitest run --exclude tests/bug_<N>.test.ts
+
+# go test の場合:
+# docker compose run --rm app go test ./... -run '^(?!TestBug<N>)'
 ```
 
 ## 失敗しない場合の対処

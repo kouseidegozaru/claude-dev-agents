@@ -20,16 +20,13 @@ tools:
 ### 1. プロジェクト構造の把握
 
 ```bash
-# ディレクトリ構成を確認
-find . -type f \
-  -not -path './.git/*' \
-  -not -path './node_modules/*' \
-  -not -path './__pycache__/*' \
-  -not -path './dist/*' \
-  | sort
+# 主要ディレクトリのみを対象にディレクトリ構成を確認（大規模プロジェクト対策）
+find src tests internal lib app cmd \
+  -maxdepth 3 -type f 2>/dev/null \
+  | head -100
 
-# 依存関係ファイルを確認（技術スタックの特定）
-ls pyproject.toml requirements.txt package.json go.mod 2>/dev/null
+# ルート直下の設定ファイル（技術スタックの特定）
+ls -la 2>/dev/null | grep -E '\.(toml|json|mod|sum|yaml|yml|lock|txt)$|^Dockerfile|Makefile' || true
 ```
 
 ### 2. Docker環境の確認
@@ -44,11 +41,17 @@ cat .env.example 2>/dev/null
 ### 3. 既存テストの把握
 
 ```bash
-# テストファイルを列挙
+# テストファイルを列挙（node_modules・vendor を除外）
 find . -type f \( -name 'test_*.py' -o -name '*_test.py' -o -name '*.test.ts' -o -name '*.test.js' -o -name '*_test.go' \) \
-  -not -path './node_modules/*'
+  -not -path './node_modules/*' \
+  -not -path './vendor/*' \
+  -not -path './.git/*'
 
-# テスト数・テスト名を確認（grep で関数名だけ抽出）
+# テスト数の正確なカウント（pytest の場合）
+docker compose run --rm app pytest --collect-only -q 2>/dev/null | tail -5
+# vitest の場合: docker compose run --rm app npx vitest list 2>/dev/null
+
+# テスト関数名の概観（grep）
 grep -rn "^def test_\|^    def test_\|it(\|describe(\|func Test" tests/ __tests__/ 2>/dev/null | head -40
 ```
 

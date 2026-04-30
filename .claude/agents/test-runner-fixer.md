@@ -1,6 +1,6 @@
 ---
 name: test-runner-fixer
-description: テストを実行し失敗箇所を自動修正するループを全テスト通過まで繰り返す。developスキルのStep6〜8で使用。テストコード自体は修正しない。
+description: Docker経由でテストを実行し失敗箇所を自動修正するループを全テスト通過まで繰り返す。/develop・/change・/fix の最終ステップで使用。テストコード自体は修正しない。
 tools:
   - Bash
   - Read
@@ -13,6 +13,7 @@ tools:
 ## 入力形式
 
 呼び出し元から以下の情報が提供されます:
+- **mode**: `new` / `change` / `fix` — 完了条件の判定に使用
 - **test_command**: テスト実行コマンド（`docker compose run --rm app <cmd>` 形式）
 - **test_files**: テストファイルのパス一覧
 - **src_dir**: ソースコードのディレクトリ
@@ -33,11 +34,12 @@ tools:
 # イメージのビルド（変更があれば再ビルド）
 docker compose build
 
-# docker-compose.yml に定義されたサービスを確認して依存サービスのみ起動
-# （サービス名は compose_file を読んで動的に判断する。`db` とは限らない）
-docker compose up -d --wait --scale app=0
-# --wait: healthcheck が通るまで待機
-# --scale app=0: app コンテナは起動しない（テスト時に run で起動するため）
+# サービス一覧を取得して app 以外（DB等の依存サービス）を起動
+deps=$(docker compose config --services | grep -v '^app$' || true)
+if [ -n "$deps" ]; then
+    docker compose up -d --wait $deps
+fi
+# app は起動しない（テスト時に docker compose run で起動するため）
 ```
 
 ### フェーズ1: 初回テスト実行
@@ -100,6 +102,12 @@ docker compose up -d --wait --scale app=0
 全テスト通過 → ループ終了 → 成功報告
 失敗あり → フェーズ2に戻る
 ```
+
+### mode別の完了条件
+
+- **mode=new**: 全テスト通過
+- **mode=change**: 全テスト通過 + 既存テストの回帰なし（=変更前と同じテスト数以上が通過）
+- **mode=fix**: バグ再現テスト（`tests/test_bug_<N>.py`）が通過 + 既存テストの回帰なし
 
 ## 無限ループ防止
 

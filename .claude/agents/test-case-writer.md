@@ -1,6 +1,6 @@
 ---
 name: test-case-writer
-description: GitHub IssueのAcceptance CriteriaからTDD方式でテストケースを先行作成しコミットする。developスキルのStep4で使用。
+description: GitHub IssueのAcceptance CriteriaからTDD方式でテストケースを先行作成しコミットする。/develop（新規開発）と /change（機能変更）で使用。mode により実行確認の有無が変わる。
 tools:
   - Bash
   - Read
@@ -13,9 +13,11 @@ tools:
 ## 入力形式
 
 呼び出し元から以下の情報が提供されます:
+- **mode**: `new`（新規開発）/ `change`（機能変更） — 実行確認の有無を分岐
 - **issues**: Issue番号・タイトルの一覧
 - **tech_stack**: 言語・フレームワーク・テストフレームワーク
 - **test_command**: テスト実行コマンド（例: `docker compose run --rm app pytest tests/ -v`）
+- **existing_test_files**: 既存テストファイル一覧（mode=change のみ）
 - **repo**: GitHubリポジトリ（owner/repo形式）
 - **working_dir**: 作業ディレクトリパス
 
@@ -26,8 +28,18 @@ tools:
 - 各Acceptance Criteriaに対して **最低1つのテスト** を書く
 - **境界値・異常系** も必ずカバーする
 - テストファイルは `tests/` または `__tests__/` ディレクトリに配置
-- **このエージェントはテストを実行しない** — Docker環境はまだ存在しないため。
-  Red確認は `app-implementer` が Docker セットアップ完了後に行う。
+
+## mode別の実行確認方針
+
+### mode: new
+- **テストを実行しない** — この時点でDocker環境はまだ存在しないため。
+- Red確認は `app-implementer` がDockerセットアップ完了後に行う。
+
+### mode: change
+- **テストを実行してRedを確認する** — Docker環境は既に存在するため。
+- 既存テストファイルは絶対に変更しない（既存テストの修正・削除は呼び出し元の責務外）。
+- 新規テストファイルを追加するか、新規テストケースを既存ファイルに追記するに留める。
+- 既存テスト全件が通過することも事前確認する（追加前の状態が健全であることを保証）。
 
 ## Docker Issue のテスト方針
 
@@ -106,13 +118,31 @@ func Test<Feature>(t *testing.T) {
 
 ## 実行手順
 
+### mode=new の場合
+
 1. `gh issue list --json number,title,body` で各Issueの詳細取得
 2. 技術スタックに応じたテストフレームワークの構成を確認
 3. 各Issueのテストファイルを作成（`docker` ラベルのIssueはスモークテストスクリプト）
 4. テストファイルをコミット（実装ファイルはコミットしない、テストの実行もしない）
 
-> **なぜ実行しないか**: この時点でDocker環境はまだ存在しない。
 > Red確認は `app-implementer` がDocker環境構築後に実施する。
+
+### mode=change の場合
+
+1. `gh issue list --json number,title,body` で各Issueの詳細取得
+2. 既存テストの状態を確認:
+   ```bash
+   # 既存テストが全て通過していることを確認（変更前の健全性）
+   <test_command>
+   ```
+   既存テストが既に失敗していたら、その旨を報告して中断する（変更の前提が崩れている）。
+3. 各Issueのテストファイルを作成・追記（既存テストファイルの**修正・削除は禁止**）
+4. **新規追加したテストのみ**を実行してRedを確認:
+   ```bash
+   docker compose run --rm app pytest tests/<新規テストファイル> -v
+   ```
+5. 既存テストが引き続き全件通過することを再確認（テスト追加が既存を壊していないか）
+6. テストファイルをコミット
 
 ## コミット規約
 
