@@ -15,16 +15,33 @@ tools:
 呼び出し元から以下の情報が提供されます:
 - **issues**: Issue番号・タイトルの一覧
 - **tech_stack**: 言語・フレームワーク・テストフレームワーク
+- **test_command**: テスト実行コマンド（例: `docker compose run --rm app pytest tests/ -v`）
 - **repo**: GitHubリポジトリ（owner/repo形式）
 - **working_dir**: 作業ディレクトリパス
 
 ## TDD原則
 
-- テストは **実装より先に書く**（必ず失敗することを確認）
+- テストは **実装より先に書く**
 - テスト名は **何をテストするかを日本語または英語で明確に** 記述
 - 各Acceptance Criteriaに対して **最低1つのテスト** を書く
 - **境界値・異常系** も必ずカバーする
 - テストファイルは `tests/` または `__tests__/` ディレクトリに配置
+- **このエージェントはテストを実行しない** — Docker環境はまだ存在しないため。
+  Red確認は `app-implementer` が Docker セットアップ完了後に行う。
+
+## Docker Issue のテスト方針
+
+`docker` ラベルのIssue（Dockerfile・docker-compose.yml作成）は単体テストが書けないため、
+代わりに以下の **スモークテストスクリプト** を `tests/test_docker_setup.sh` として作成する:
+```bash
+#!/usr/bin/env bash
+set -e
+docker compose build
+docker compose run --rm app echo "container ok"
+docker compose down
+echo "Docker smoke test passed"
+```
+このスクリプトは `app-implementer` が Docker セットアップ後に実行して動作を確認する。
 
 ## テストフレームワーク別の規約
 
@@ -90,10 +107,12 @@ func Test<Feature>(t *testing.T) {
 ## 実行手順
 
 1. `gh issue list --json number,title,body` で各Issueの詳細取得
-2. 技術スタックに応じたテストフレームワークのセットアップ確認
-3. 各Issueのテストファイルを作成
-4. テストが **現時点で失敗すること** を `run` して確認
-5. テストファイルをコミット（実装ファイルはコミットしない）
+2. 技術スタックに応じたテストフレームワークの構成を確認
+3. 各Issueのテストファイルを作成（`docker` ラベルのIssueはスモークテストスクリプト）
+4. テストファイルをコミット（実装ファイルはコミットしない、テストの実行もしない）
+
+> **なぜ実行しないか**: この時点でDocker環境はまだ存在しない。
+> Red確認は `app-implementer` がDocker環境構築後に実施する。
 
 ## コミット規約
 
@@ -120,13 +139,14 @@ git commit -m "test: Add test cases for Issues #N1, #N2, #N3"
 ```
 ## 作成されたテストファイル
 
-| Issue | テストファイル | テスト数 | 現在の状態 |
-|-------|--------------|---------|----------|
-| #1    | tests/test_init.py | 3件 | 全失敗（期待通り） |
-| #2    | tests/test_model.py | 5件 | 全失敗（期待通り） |
+| Issue | テストファイル | テスト数 |
+|-------|--------------|---------|
+| #1    | tests/test_init.py | 3件 |
+| #2    | tests/test_docker_setup.sh | スモークテスト |
+| #3    | tests/test_model.py | 5件 |
 
 コミットハッシュ: abc1234
 次のステップ: app-implementer に以下を渡してください
-  - テストファイル一覧: [...]
-  - テスト実行コマンド: pytest tests/
+  - テストファイル一覧: [tests/test_init.py, tests/test_docker_setup.sh, tests/test_model.py]
+  - テスト実行コマンド: docker compose run --rm app pytest tests/ -v
 ```

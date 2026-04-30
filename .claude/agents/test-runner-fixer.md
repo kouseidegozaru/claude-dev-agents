@@ -33,9 +33,11 @@ tools:
 # イメージのビルド（変更があれば再ビルド）
 docker compose build
 
-# 依存サービス（DBなど）の起動と疎通確認
-docker compose up -d db
-docker compose run --rm app <ヘルスチェックコマンド>
+# docker-compose.yml に定義されたサービスを確認して依存サービスのみ起動
+# （サービス名は compose_file を読んで動的に判断する。`db` とは限らない）
+docker compose up -d --wait --scale app=0
+# --wait: healthcheck が通るまで待機
+# --scale app=0: app コンテナは起動しない（テスト時に run で起動するため）
 ```
 
 ### フェーズ1: 初回テスト実行

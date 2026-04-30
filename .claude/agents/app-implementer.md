@@ -38,15 +38,31 @@ Issueの依存関係に従って以下の順で実装:
 6. アプリ層（ルーティング・コントローラ）
 7. UI層
 
-### テスト駆動の実装フロー（Issue単位）
+### 実装フェーズの区分
 
+Docker環境が存在しないうちはテストを実行できないため、実装を2フェーズに分ける。
+
+**フェーズA — インフラ準備（TDDなし）**
+対象: `setup` ラベル・`docker` ラベルのIssue（通常 #1, #2）
+```
+1. プロジェクト構造を作成（ディレクトリ・設定ファイル・依存関係ファイル）
+2. .gitignore を作成（.env, node_modules/, __pycache__/, dist/ 等を除外）
+3. Dockerfile / docker-compose.yml / .env.example を作成
+4. .env.example を .env にコピー（実テスト用、コミットしない）
+5. docker compose build でイメージをビルド
+6. tests/test_docker_setup.sh を実行してスモークテストを確認
+7. ここまでをまとめてコミット
+```
+
+**フェーズB — 機能実装（TDDサイクル）**
+対象: `feature` ラベルのIssue（#3以降）— Docker環境が整った後
 ```
 1. そのIssueのテストを確認（gh issue view #N）
-2. テストを実行 → Redを確認
+2. docker compose run --rm app <テストコマンド> → Redを確認
 3. テストが通る最小限のコードを実装
-4. テストを実行 → Greenを確認
+4. docker compose run --rm app <テストコマンド> → Greenを確認
 5. リファクタリング（テストを壊さない範囲で）
-6. コミット
+6. コミット（Issue番号を含める）
 ```
 
 ## ディレクトリ構成の標準
@@ -126,7 +142,7 @@ EXPOSE <port>
 CMD ["<起動コマンド>"]
 ```
 
-### docker-compose.yml（標準構成）
+### docker-compose.yml（DB ありの場合）
 ```yaml
 services:
   app:
@@ -158,14 +174,26 @@ volumes:
   db_data:
 ```
 
-### docker-compose.test.yml（テスト用オーバーライド）
+### docker-compose.yml（DB なし・CLIアプリ等の場合）
 ```yaml
 services:
   app:
-    volumes: []           # テスト時はバインドマウントを無効化
+    build: .
+    env_file: .env
+    volumes:
+      - .:/app
+```
+
+### docker-compose.test.yml（テスト用オーバーライド）
+```yaml
+# docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm app
+services:
+  app:
+    # volumes の上書き: Compose はリストを置換するため [] で開発用マウントを除去できる
+    volumes: []
     environment:
-      - DB_NAME=test_db
-    command: <テスト実行コマンド>
+      DB_NAME: test_db   # テスト用DB名に上書き
+    # command は指定しない — run 時に引数で渡す
 
   db:
     environment:
@@ -206,11 +234,10 @@ docker compose run --rm app <テストコマンド>
 
 ## 実行手順
 
-1. 既存のテストファイルを全て読んでAcceptance Criteriaを把握
-2. プロジェクト初期化（セットアップIssueから着手）
-3. Issue順に実装（1 Issue = 1コミット）
-4. 各Issue実装後にそのIssueのテストを実行して確認
-5. テストが通ったらコミット、通らなければ修正してから実装を継続
+1. テストファイルを全て読んでAcceptance Criteriaを把握
+2. **フェーズA**: setup・dockerラベルのIssueを実装し、Docker環境を起動してスモークテストを確認
+3. **フェーズB**: featureラベルのIssueをTDDサイクルで1つずつ実装（Red → Green → コミット）
+4. 全Issue実装後、全テストを一括実行して回帰がないか確認
 
 ## コミット規約
 
