@@ -1,62 +1,82 @@
 # 開発ワークフロー
 
-このプロジェクトでは `/develop` スキルを使ったTDD駆動の開発ワークフローを採用しています。
+TDD駆動・Docker実行・GitHub Issue管理の3本柱で開発・変更・修正を自動化します。
 
-## 使い方
+## スキル一覧
 
-```
-/develop
-```
-
-その後、「○○○のアプリを作りたい」のように抽象的な命令を入力するだけです。
-残りは自動で進みます。
+| コマンド | 用途 | Docker要否 |
+|---------|------|-----------|
+| `/develop` | 新規アプリの開発（ゼロから） | セットアップ含む |
+| `/change` | 既存アプリへの機能追加・変更 | 既存環境を使用 |
+| `/fix` | 既存アプリのバグ修正 | 既存環境を使用 |
 
 ---
 
-## ワークフロー全体像
+## `/develop` — 新規開発
 
 ```
 ユーザー命令
     │
-    ▼
-[Step 1] 命令の受取・分析（メインコンテキスト）
+    ▼ メインコンテキスト
+[Step 1] 命令の受取・分析
+[Step 2] 不足情報の一括質問 ← ユーザー回答
     │
-    ▼
-[Step 2] 不足情報の一括質問（メインコンテキスト）
-    │  ← ユーザー回答
-    ▼
-[Step 3] GitHub Issue作成         → issue-creator エージェント
+    ▼ サブエージェントへ委譲
+[Step 3] GitHub Issue作成         → issue-creator
+[Step 4] テストケース先行作成     → test-case-writer  ※テスト実行はしない
+[Step 5] 実装                     → app-implementer
+         ├─ フェーズA: プロジェクト初期化 + Docker構築（TDDなし）
+         └─ フェーズB: 機能実装（Red → Green サイクル）
+[Step 6〜8] テスト・自動修正ループ → test-runner-fixer
+```
+
+---
+
+## `/change` — 機能変更
+
+```
+変更リクエスト
     │
-    ▼
-[Step 4] テストケース先行作成(TDD) → test-case-writer エージェント
+    ▼ サブエージェント → メインコンテキスト
+[Step 2] 既存コード解析            → code-analyzer
+[Step 3] 不足情報の質問（後方互換・データ移行等） ← ユーザー回答
     │
-    ▼
-[Step 5] アプリケーション実装      → app-implementer エージェント
+    ▼ サブエージェントへ委譲
+[Step 4] GitHub Issue作成（enhancement） → issue-creator
+[Step 5] テストケース追加         → test-case-writer  ※既存テストは変更しない
+[Step 6] 変更実装                 → app-implementer   ※Docker再セットアップ不要
+[Step 7〜8] テスト・自動修正ループ → test-runner-fixer ※既存テストも全件通過が条件
+```
+
+---
+
+## `/fix` — バグ修正
+
+```
+バグ説明（または /fix #N でIssue指定）
     │
-    ▼
-[Step 6] テスト実行                ┐
-    │                              │ test-runner-fixer エージェント
-[Step 7] 自動修正                  │ （全通過まで繰り返し）
-    │                              │
-[Step 8] 全通過まで6,7を繰り返す   ┘
+    ▼ サブエージェント → メインコンテキスト
+[Step 2] 既存コード解析・バグ箇所特定 → code-analyzer
+[Step 3] GitHub Issue作成（bug）       → issue-creator ※Issue既存の場合スキップ
     │
-    ▼
-完了報告（Issue一覧・テスト結果・コミット履歴）
+    ▼ サブエージェントへ委譲
+[Step 4] バグ再現テスト作成・失敗確認 → bug-reproducer  ※Docker実行で失敗を確認
+[Step 5] バグ修正実装               → app-implementer ※Docker再セットアップ不要
+[Step 6〜7] テスト・自動修正ループ   → test-runner-fixer
 ```
 
 ---
 
 ## サブエージェント一覧
 
-| エージェント | 役割 | 使用ツール |
+| エージェント | 役割 | 使用スキル |
 |-------------|------|-----------|
-| `issue-creator` | 要件からGitHub Issueを設計・登録（Dockerセットアップ含む） | Bash (gh), Read |
-| `test-case-writer` | IssueからTDDテストを先行作成 | Bash, Read, Write, Edit |
-| `app-implementer` | Dockerfile・docker-compose.yml を含む実装全体 | Bash, Read, Write, Edit |
-| `test-runner-fixer` | Docker経由でテスト実行→自動修正→全通過まで繰り返し | Bash, Read, Edit |
-
-サブエージェントを分けることで、各フェーズのコンテキストを独立させ、
-メインの会話コンテキストを節約しています。
+| `code-analyzer` | 既存コードを解析して変更箇所・影響範囲を特定 | `/change` `/fix` |
+| `issue-creator` | GitHub Issueを設計・登録（feature/enhancement/bug対応） | 全スキル |
+| `test-case-writer` | TDDテストを先行作成（実行はしない） | `/develop` `/change` |
+| `bug-reproducer` | バグを再現する失敗テストを作成・実行確認 | `/fix` |
+| `app-implementer` | 実装（新規開発はDockerセットアップ含む） | 全スキル |
+| `test-runner-fixer` | テスト実行→自動修正→全通過まで繰り返し | 全スキル |
 
 ---
 
@@ -64,10 +84,10 @@
 
 | プレフィックス | 用途 |
 |--------------|------|
-| `feat:` | 機能実装（Issue番号を末尾に付ける例: `feat: Add login (#3)`） |
-| `test:` | テストケースの追加 |
-| `fix:` | バグ修正・テスト失敗の修正 |
-| `chore:` | 設定・依存関係の変更 |
+| `feat:` | 機能実装（例: `feat: Add login (#3)`） |
+| `test:` | テストケースの追加・修正 |
+| `fix:` | バグ修正（例: `fix: Fix UTC comparison in auth (#12)`） |
+| `chore:` | 設定・依存関係・Docker構成の変更 |
 
 ---
 
@@ -76,7 +96,6 @@
 - `gh` コマンドがインストール済みで認証済みであること
 - `docker` および `docker compose` がインストール済みであること
 - GitHubリポジトリが作成済みでリモートが設定済みであること
-- テストフレームワークの選定は `/develop` 実行時の質問で決定
 - テストはすべて `docker compose run --rm app <テストコマンド>` 経由で実行される
 
 ---
@@ -86,11 +105,16 @@
 ```
 .claude/
   skills/
-    develop.md          # /develop スラッシュコマンドの定義
+    develop.md           # /develop — 新規開発
+    change.md            # /change  — 機能変更
+    fix.md               # /fix     — バグ修正
   agents/
-    issue-creator.md    # GitHub Issue作成エージェント
-    test-case-writer.md # テストケース先行作成エージェント
-    app-implementer.md  # アプリ実装エージェント
-    test-runner-fixer.md# テスト実行・自動修正エージェント
-CLAUDE.md               # このファイル
+    code-analyzer.md     # 既存コード解析（/change・/fix 共通）
+    issue-creator.md     # GitHub Issue作成（feature/enhancement/bug 対応）
+    test-case-writer.md  # TDDテスト先行作成（実行なし）
+    bug-reproducer.md    # バグ再現テスト作成・失敗確認（/fix 専用）
+    app-implementer.md   # アプリ実装
+    test-runner-fixer.md # テスト実行・自動修正ループ
+  settings.json          # 自動許可コマンドの設定
+CLAUDE.md                # このファイル
 ```
