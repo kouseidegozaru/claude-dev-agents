@@ -2,5 +2,23 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "claude-sonnet-4-6",
   "language": "japanese",
-  "autoUpdatesChannel": "stable"
+  "autoUpdatesChannel": "stable",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx vite build:*)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  }
 }
