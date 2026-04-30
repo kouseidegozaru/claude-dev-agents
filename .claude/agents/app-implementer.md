@@ -16,7 +16,8 @@ tools:
 - **issues**: Issue番号・タイトルの一覧（実装推奨順序付き）
 - **tech_stack**: 言語・フレームワーク・ライブラリ
 - **test_files**: テストファイルのパス一覧
-- **test_command**: テスト実行コマンド
+- **test_command**: テスト実行コマンド（Docker経由）
+- **docker_config**: ベースイメージ・公開ポート・追加サービス情報
 - **working_dir**: 作業ディレクトリパス
 
 ## 実装原則
@@ -30,11 +31,12 @@ tools:
 ### 実装順序
 Issueの依存関係に従って以下の順で実装:
 1. プロジェクト構造のセットアップ（ディレクトリ・設定ファイル）
-2. データモデル・スキーマ
-3. コアビジネスロジック
-4. インフラ層（DB・外部API）
-5. アプリ層（ルーティング・コントローラ）
-6. UI層
+2. **Docker環境構築**（Dockerfile・docker-compose.yml・.env.example）
+3. データモデル・スキーマ
+4. コアビジネスロジック
+5. インフラ層（DB・外部API）
+6. アプリ層（ルーティング・コントローラ）
+7. UI層
 
 ### テスト駆動の実装フロー（Issue単位）
 
@@ -49,6 +51,15 @@ Issueの依存関係に従って以下の順で実装:
 
 ## ディレクトリ構成の標準
 
+全プロジェクト共通で以下のDockerファイルを含めます:
+```
+Dockerfile
+docker-compose.yml
+docker-compose.test.yml   (テスト用。本番サービスを上書きする差分のみ)
+.env.example
+.dockerignore
+```
+
 ### Python プロジェクト
 ```
 src/
@@ -60,6 +71,9 @@ src/
 tests/
   conftest.py
 pyproject.toml または requirements.txt
+Dockerfile
+docker-compose.yml
+.env.example
 ```
 
 ### Node.js/TypeScript プロジェクト
@@ -72,6 +86,9 @@ src/
 tests/         または __tests__/
 package.json
 tsconfig.json
+Dockerfile
+docker-compose.yml
+.env.example
 ```
 
 ### Go プロジェクト
@@ -84,6 +101,107 @@ internal/
   handlers/
 go.mod
 go.sum
+Dockerfile
+docker-compose.yml
+.env.example
+```
+
+## Docker設定テンプレート
+
+### Dockerfile（マルチステージビルド）
+```dockerfile
+# --- build stage ---
+FROM <base-image> AS builder
+WORKDIR /app
+COPY <依存関係ファイル> .
+RUN <依存関係インストール>
+COPY . .
+RUN <ビルドコマンド（あれば）>
+
+# --- runtime stage ---
+FROM <slim-image> AS runtime
+WORKDIR /app
+COPY --from=builder /app .
+EXPOSE <port>
+CMD ["<起動コマンド>"]
+```
+
+### docker-compose.yml（標準構成）
+```yaml
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app          # 開発時のホットリロード用
+
+  db:
+    image: postgres:16-alpine   # または mysql:8 / mongo:7 等
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+```
+
+### docker-compose.test.yml（テスト用オーバーライド）
+```yaml
+services:
+  app:
+    volumes: []           # テスト時はバインドマウントを無効化
+    environment:
+      - DB_NAME=test_db
+    command: <テスト実行コマンド>
+
+  db:
+    environment:
+      POSTGRES_DB: test_db
+```
+
+### .env.example
+```
+APP_PORT=8080
+DB_NAME=appdb
+DB_USER=appuser
+DB_PASSWORD=changeme
+DB_HOST=db
+DB_PORT=5432
+```
+
+### .dockerignore
+```
+.git
+.env
+node_modules/    # Node.jsの場合
+__pycache__/     # Pythonの場合
+*.pyc
+.pytest_cache/
+dist/
+```
+
+## テスト実行（Docker経由）
+
+実装後のテスト確認コマンド:
+```bash
+# テスト用コンテナを起動してテスト実行後に破棄
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm app
+
+# または単一サービスだけ起動してテスト
+docker compose run --rm app <テストコマンド>
 ```
 
 ## 実行手順

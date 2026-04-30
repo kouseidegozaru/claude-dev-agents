@@ -26,6 +26,7 @@ tools:
 
 ### 必須ラベル
 - `setup`: 環境構築・設定
+- `docker`: Docker関連
 - `feature`: 機能実装
 - `test`: テスト専用
 - `refactor`: リファクタリング
@@ -34,12 +35,13 @@ tools:
 要件を以下の順序でIssueに分割します:
 
 1. **プロジェクト初期化** (setup): 依存関係・ディレクトリ構成・設定ファイル
-2. **データモデル定義** (feature): スキーマ・エンティティ・バリデーション
-3. **コアロジック** (feature): ビジネスロジックの核心部分（UIなし）
-4. **インフラ層** (feature): DB接続・外部API・ファイルI/O
-5. **アプリ層** (feature): ルーティング・コントローラ・サービス
-6. **UI層** (feature): 画面・コンポーネント・インタラクション
-7. **統合テスト** (test): E2Eシナリオ
+2. **Docker環境構築** (docker): Dockerfile・docker-compose.yml・.env.example
+3. **データモデル定義** (feature): スキーマ・エンティティ・バリデーション
+4. **コアロジック** (feature): ビジネスロジックの核心部分（UIなし）
+5. **インフラ層** (feature): DB接続・外部API・ファイルI/O
+6. **アプリ層** (feature): ルーティング・コントローラ・サービス
+7. **UI層** (feature): 画面・コンポーネント・インタラクション
+8. **統合テスト** (test): E2Eシナリオ
 
 ### Issueテンプレート
 ```markdown
@@ -74,6 +76,7 @@ tools:
 ```bash
 # ラベル作成
 gh label create "setup" --color "#0075ca" --description "環境構築・設定"
+gh label create "docker" --color "#0db7ed" --description "Docker関連"
 gh label create "feature" --color "#84b6eb" --description "機能実装"
 
 # Issue作成

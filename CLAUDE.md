@@ -50,10 +50,10 @@
 
 | エージェント | 役割 | 使用ツール |
 |-------------|------|-----------|
-| `issue-creator` | 要件からGitHub Issueを設計・登録 | Bash (gh), Read |
+| `issue-creator` | 要件からGitHub Issueを設計・登録（Dockerセットアップ含む） | Bash (gh), Read |
 | `test-case-writer` | IssueからTDDテストを先行作成 | Bash, Read, Write, Edit |
-| `app-implementer` | IssueとテストをもとにGreenになるよう実装 | Bash, Read, Write, Edit |
-| `test-runner-fixer` | テスト実行→自動修正→全通過まで繰り返し | Bash, Read, Edit |
+| `app-implementer` | Dockerfile・docker-compose.yml を含む実装全体 | Bash, Read, Write, Edit |
+| `test-runner-fixer` | Docker経由でテスト実行→自動修正→全通過まで繰り返し | Bash, Read, Edit |
 
 サブエージェントを分けることで、各フェーズのコンテキストを独立させ、
 メインの会話コンテキストを節約しています。
@@ -74,8 +74,10 @@
 ## 前提条件
 
 - `gh` コマンドがインストール済みで認証済みであること
+- `docker` および `docker compose` がインストール済みであること
 - GitHubリポジトリが作成済みでリモートが設定済みであること
 - テストフレームワークの選定は `/develop` 実行時の質問で決定
+- テストはすべて `docker compose run --rm app <テストコマンド>` 経由で実行される
 
 ---
 

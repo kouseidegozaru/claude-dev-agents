@@ -12,9 +12,10 @@ tools:
 ## 入力形式
 
 呼び出し元から以下の情報が提供されます:
-- **test_command**: テスト実行コマンド（例: `pytest tests/ -v`）
+- **test_command**: テスト実行コマンド（`docker compose run --rm app <cmd>` 形式）
 - **test_files**: テストファイルのパス一覧
 - **src_dir**: ソースコードのディレクトリ
+- **compose_file**: docker-compose.yml のパス（テスト用オーバーライドがある場合は両方）
 - **working_dir**: 作業ディレクトリパス
 
 ## 絶対規則
@@ -24,6 +25,17 @@ tools:
 3. **修正はソースコードのみ** — src/、internal/、lib/ 等の実装ファイルのみ変更可
 
 ## ループ実行手順
+
+### フェーズ0: Docker環境の準備
+
+```bash
+# イメージのビルド（変更があれば再ビルド）
+docker compose build
+
+# 依存サービス（DBなど）の起動と疎通確認
+docker compose up -d db
+docker compose run --rm app <ヘルスチェックコマンド>
+```
 
 ### フェーズ1: 初回テスト実行
 
@@ -55,7 +67,15 @@ tools:
 → バリデーションロジックが欠如 → エラーハンドリングを追加
 
 パターン6: 環境・依存関係エラー
-→ パッケージが不足 → インストールしてから再実行
+→ パッケージが不足 → Dockerfile/依存関係ファイルを更新して docker compose build してから再実行
+
+パターン7: コンテナ接続エラー（DB接続失敗・ポート未公開）
+→ docker-compose.yml の depends_on / healthcheck を確認・修正
+→ .env の接続先ホスト名がサービス名と一致しているか確認（localhost → db など）
+
+パターン8: ファイルのマウント・パス解決エラー
+→ docker-compose.yml の volumes 設定を確認
+→ コンテナ内のWORKDIRとパスが一致しているか確認
 ```
 
 ### フェーズ3: 修正
@@ -97,11 +117,18 @@ tools:
 - 修正内容: <簡潔な説明>
 ```
 
+## クリーンアップ
+
+テスト完了後にコンテナを停止:
+```bash
+docker compose down
+```
+
 ## コミット
 
-全テスト通過後にバグ修正をコミット:
+全テスト通過後にバグ修正をコミット（Dockerファイルの修正も含める）:
 ```bash
-git add src/   # テストファイルはaddしない
+git add src/ Dockerfile docker-compose.yml   # テストファイルはaddしない
 git commit -m "fix: Fix test failures - <主な修正内容の概要>"
 ```
 
