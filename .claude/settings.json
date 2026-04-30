@@ -6,6 +6,8 @@
   "permissions": {
     "allow": [
       "Read",
+      "Write",
+      "Edit",
       "Bash(grep:*)",
       "Bash(ls:*)",
       "Bash(find:*)",
@@ -15,6 +17,12 @@
       "Bash(wc:*)",
       "Bash(file:*)",
       "Bash(stat:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(touch:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(docker:*)",
       "Bash(npx vitest:*)",
       "Bash(npx vite build:*)",
       "WebFetch",
