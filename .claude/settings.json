@@ -26,7 +26,18 @@
       "Bash(npx vitest:*)",
       "Bash(npx vite build:*)",
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "Bash(~/.local/bin/gh label list *)",
+      "Bash(~/.local/bin/gh issue create *)",
+      "Bash(~/.local/bin/gh label create *)",
+      "Bash(~/.local/bin/gh issue list *)",
+      "Bash(docker compose run *)",
+      "Bash(docker compose build *)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose down *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git add *)"
     ]
   }
 }
