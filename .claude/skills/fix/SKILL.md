@@ -64,16 +64,23 @@ gh issue view 12
 - 関連するファイル・関数
 - 既存テストの件数とテスト実行コマンド
 
-## Step 3: GitHub Issue作成（サブエージェントに委譲・新規の場合のみ）
+## Step 3: GitHub Issue作成 + ブランチ作成（サブエージェント → メインコンテキスト）
 
-Issue番号が既に指定された場合はスキップします。
+Issue番号が既に指定された場合は Issue作成をスキップし、ブランチ作成のみ行います。
 
+**Issue作成（新規の場合のみ）:**
 `issue-creator` サブエージェントに以下を渡します:
 - **mode**: `fix`
 - **label_hint**: `bug`
 - バグの説明と解析結果
 - **affected_files**: バグ関連ファイル（`code-analyzer` の結果）
 - 1件のIssueのみ作成（バグ1つ = Issue1つ）
+
+Issue番号が確定したら（既存指定または新規作成問わず）、メインコンテキストでブランチを作成します:
+```bash
+git checkout -b fix/<バグの要約>   # 例: fix/login-crash
+git push -u origin fix/<バグの要約>
+```
 
 ## Step 4: バグ再現テスト作成（サブエージェントに委譲）
 
@@ -114,10 +121,29 @@ Issue番号が既に指定された場合はスキップします。
 - バグ再現テスト（`tests/test_bug_<N>.py`）が通過する
 - 既存テストが全件通過する（リグレッションなし）
 
+## Step 8: PR作成・マージ・main に戻る
+
+全テスト通過後、メインコンテキストで以下を実行します:
+
+```bash
+PR_URL=$(gh pr create \
+  --title "<大分類Issueのタイトル>" \
+  --body "Closes #<大分類Issue番号>" \
+  --base main \
+  --head <ブランチ名>)
+
+PR_NUM=$(gh pr view --json number -q .number)
+gh pr merge $PR_NUM --merge --delete-branch
+
+git checkout main
+git pull origin main
+```
+
 ## 完了報告
 
 全ステップ完了後、ユーザーに以下を報告します:
 - 修正したIssue番号とタイトル
 - 修正ファイル一覧
 - テスト結果サマリー（バグ再現テスト + 既存テスト 全件通過）
+- マージされたPRのURL
 - 最終コミットハッシュ

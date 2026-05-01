@@ -49,7 +49,7 @@ Step3以降は専用サブエージェントに委譲します。
 
 ユーザーの回答を受け取ったら Step 3 に進みます。
 
-## Step 3: GitHub Issue作成（サブエージェントに委譲）
+## Step 3: GitHub Issue作成 + ブランチ作成（サブエージェント → メインコンテキスト）
 
 `issue-creator` サブエージェントに以下を渡します:
 - **mode**: `new`
@@ -58,7 +58,13 @@ Step3以降は専用サブエージェントに委譲します。
 - Step2の質問と回答のペア一覧
 - 作業ディレクトリパスとGitHubリポジトリ情報
 
-`issue-creator` が返したIssue番号・タイトルの一覧を記録します。
+`issue-creator` が返したIssue番号・タイトル・**ブランチ名**の一覧を記録します。
+
+その後、メインコンテキストで大分類Issueのブランチを作成します:
+```bash
+git checkout -b <ブランチ名>   # 例: feature/user-auth
+git push -u origin <ブランチ名>
+```
 
 ## Step 4: テストケース先行作成（サブエージェントに委譲）
 
@@ -90,10 +96,32 @@ Step3以降は専用サブエージェントに委譲します。
 
 サブエージェントは全テストが通るまで自律的に修正ループを繰り返します。
 
+## Step 9: PR作成・マージ・main に戻る
+
+全テスト通過後、メインコンテキストで以下を実行します:
+
+```bash
+# PR作成
+PR_URL=$(gh pr create \
+  --title "<大分類Issueのタイトル>" \
+  --body "Closes #<大分類Issue番号>" \
+  --base main \
+  --head <ブランチ名>)
+
+# PR番号を取得してマージ
+PR_NUM=$(gh pr view --json number -q .number)
+gh pr merge $PR_NUM --merge --delete-branch
+
+# main に戻って最新を取得
+git checkout main
+git pull origin main
+```
+
 ## 完了報告
 
 全ステップ完了後、ユーザーに以下を報告します:
 - 作成されたIssue一覧（番号・タイトル）
 - 実装されたファイル一覧
 - テスト結果サマリー（通過数/総数）
+- マージされたPRのURL
 - 最終コミットハッシュ
