@@ -37,7 +37,14 @@
       "Bash(docker compose down *)",
       "Bash(git commit *)",
       "Bash(git push *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git checkout *)",
+      "Bash(~/.local/bin/gh pr create *)",
+      "Bash(~/.local/bin/gh pr merge *)",
+      "Bash(~/.local/bin/gh pr view *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr view *)"
     ]
   }
 }
