@@ -68,7 +68,7 @@ Issueの依存関係に従って以下の順で実装:
 4. .env.example を .env にコピー（実テスト用、コミットしない）
 5. docker compose build でイメージをビルド
 6. bash tests/test_docker_setup.sh を実行してスモークテストを確認
-7. ここまでをまとめてコミット
+7. Issueごとにコミットして Close する（下記「コミット & Issue Close」参照）
 ```
 
 **フェーズB — 機能実装/変更/修正（TDDサイクル）**
@@ -83,7 +83,7 @@ Issueの依存関係に従って以下の順で実装:
 4. 該当Issueのテストを実行 → Greenを確認
 5. 全テストを実行 → 既存テストを壊していないか（回帰チェック）
 6. リファクタリング（テストを壊さない範囲で）
-7. コミット（Issue番号を含める）
+7. コミットして Close する（下記「コミット & Issue Close」参照）
 ```
 
 ## ディレクトリ構成の標準
@@ -258,15 +258,20 @@ docker compose run --rm app <テストコマンド>
 ### mode=new の場合
 1. テストファイルを全て読んでAcceptance Criteriaを把握
 2. **フェーズA**: setup・dockerラベルのIssueを実装し、Docker環境を起動してスモークテストを確認
-3. **フェーズB**: feature ラベルのIssueをTDDサイクルで1つずつ実装（Red → Green → コミット）
-4. 全Issue実装後、全テストを一括実行して回帰がないか確認
+   → Issueごとにコミット → `gh issue close #N`
+3. **フェーズB**: feature ラベルのIssueをTDDサイクルで1つずつ実装
+   → IssueごとにRed → Green → コミット → `gh issue close #N`
+4. 全具体化Issue完了後、全テストを一括実行して回帰がないか確認
+5. 大分類IssueをClose: `gh issue close <大分類Issue番号>`
 
 ### mode=change の場合
 1. `analysis` を読んでプロジェクトと変更影響範囲を把握
 2. テストファイルを読んで Acceptance Criteria を把握
 3. `docker compose ps` で環境を確認（必要なら `docker compose up -d --wait` で依存サービスを起動）
 4. **フェーズBのみ**: enhancement ラベルのIssueをTDDサイクルで実装
-5. 全Issue実装後、全テストを実行して既存機能の回帰がないか確認
+   → IssueごとにRed → Green → コミット → `gh issue close #N`
+5. 全具体化Issue完了後、全テストを実行して回帰がないか確認
+6. 大分類IssueをClose: `gh issue close <大分類Issue番号>`
 
 ### mode=fix の場合
 1. `analysis` を読んでバグの推定箇所を把握
@@ -275,20 +280,35 @@ docker compose run --rm app <テストコマンド>
 4. バグ再現テストを実行 → Redを確認（既に Red のはずだが念のため）
 5. `affected_files` を最小限修正してバグ再現テストを Green にする
 6. 全テストを実行 → 既存テストの回帰がないか確認
-7. コミット
+7. コミット → `gh issue close <具体化Issue番号>` → `gh issue close <大分類Issue番号>`
 
-## コミット規約
+## コミット & Issue Close
+
+具体化Issue（コミット単位）が完了するたびに **コミット → Close** をセットで実行します。
 
 ```bash
-# セットアップ
-git commit -m "feat: Initialize project structure (#1)"
-
-# 機能実装
+# 1. コミット（Issue番号を必ず含める）
+git add <変更ファイル>
 git commit -m "feat: Implement user data model (#2)"
-git commit -m "feat: Add authentication service (#3)"
 
-# Issue番号を必ず含める
+# 2. 具体化IssueをClose
+gh issue close 2 --comment "実装完了。コミット: $(git rev-parse --short HEAD)"
 ```
+
+全具体化Issueが完了したら、大分類Issue（ブランチ単位）もCloseします。
+
+```bash
+gh issue close <大分類Issue番号> --comment "関連する実装Issueが全て完了しました。"
+```
+
+### コミットメッセージ規約
+
+| プレフィックス | 用途 | 例 |
+|--------------|------|-----|
+| `feat:` | 機能実装 | `feat: Implement user schema (#2)` |
+| `fix:` | バグ修正 | `fix: Fix null check in auth (#5)` |
+| `chore:` | setup/docker/設定 | `chore: Initialize project structure (#1)` |
+| `test:` | テスト追加 | `test: Add auth integration tests (#6)` |
 
 ## 禁止事項
 
@@ -310,10 +330,10 @@ git commit -m "feat: Add authentication service (#3)"
 ...
 
 ### Issue別の状況
-| Issue | 実装ファイル | テスト結果 |
-|-------|------------|---------|
-| #1    | pyproject.toml, src/__init__.py | 通過 |
-| #2    | src/models/user.py | 通過 |
+| Issue | 実装ファイル | テスト結果 | Close |
+|-------|------------|---------|-------|
+| #1    | pyproject.toml, src/__init__.py | 通過 | 済 |
+| #2    | src/models/user.py | 通過 | 済 |
 
 ### コミット履歴
 - abc1234: feat: Initialize project structure (#1)
