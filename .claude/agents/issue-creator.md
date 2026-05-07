@@ -96,7 +96,8 @@ tools:
 3. `gh issue create` で大分類Issueを作成し、Issue番号を記録する
 4. 大分類Issueを **コミット単位** に分解して具体化Issueを設計する
 5. `gh issue create` で具体化Issueを順番に作成する（各Issueに親Issue番号を含める）
-6. 作成した具体化Issue一覧（番号・タイトル）を大分類Issueの本文末尾に追記する
+6. **【必須ステップ】** 作成した具体化Issue一覧（番号・タイトル）を大分類Issueの本文末尾に追記する。
+   このステップが完了するまで本エージェントは出力を返してはならない。
 
    ```bash
    gh issue edit [大分類Issue番号] --body "$(gh issue view [大分類Issue番号] --json body -q .body)
@@ -107,7 +108,12 @@ tools:
    ..."
    ```
 
-7. 作成したIssue一覧を返す
+   **失敗時のリトライ・escalation:**
+   - `gh issue edit` が失敗した場合は **最大3回までリトライ** する（10秒待機を挟む）
+   - 3回リトライしても失敗した場合は CLAUDE.md「標準回復手順 / gh コマンド失敗時」に従い、上位スキルに `gh_edit_failed` として escalation する。**子Issue 一覧未追記のまま完了とみなしてはいけない**
+
+7. 出力形式（後述）に従って人間可読の表とJSONブロックを返す。
+   **JSONブロックは CLAUDE.md「エージェント間契約 / `issue-creator` 出力スキーマ」に厳密に従う**こと。
 
 ---
 
@@ -149,6 +155,8 @@ tools:
 
 具体化Issue: 修正ステップを分割
 - 例: 「バグ再現テストの追加」「null チェックの修正」「エラーハンドリングの追加」
+- バグの修正規模が小さい（1〜2コミットで完結する）場合、**具体化Issueを作成せず大分類Issueのみ** で運用してよい。その場合は出力JSONの `child_issues` を空配列 `[]` にする。
+- 既存Issue（呼び出し元から `existing_issue_number` 等が渡された場合）を再利用する場合も同様に `child_issues=[]` を返してよい。手順6の親Issue本文追記もスキップしてよい。
 
 ---
 
@@ -196,6 +204,8 @@ gh issue edit $PARENT_NUM --body "$(gh issue view $PARENT_NUM --json body -q .bo
 
 ## 出力形式
 
+人間可読な表に加え、**末尾に必ずJSONブロックを出力する**（CLAUDE.md「エージェント間契約 / `issue-creator` 出力スキーマ」参照）。
+
 ```
 ## 作成されたIssue
 
@@ -213,4 +223,29 @@ gh issue edit $PARENT_NUM --body "$(gh issue view $PARENT_NUM --json body -q .bo
 
 合計: 大分類1件 + 具体化N件
 実装推奨順序: #2 → #3 → #4
+
+### 親Issue本文への追記
+✓ 大分類Issue #1 の本文末尾に「## 実装Issue一覧」を追記済み
+
+```json
+{
+  "parent_issue": {
+    "number": 1,
+    "title": "ユーザー認証機能の追加",
+    "branch": "feature/user-auth"
+  },
+  "child_issues": [
+    {"number": 2, "title": "ユーザーテーブルのスキーマ定義", "label": "feature", "order": 1},
+    {"number": 3, "title": "認証ミドルウェアの実装",       "label": "feature", "order": 2},
+    {"number": 4, "title": "ログインAPIエンドポイントの作成", "label": "feature", "order": 3}
+  ]
+}
 ```
+```
+
+### JSON出力のルール
+
+- `parent_issue.branch` は必ず1本（複数ブランチは作らない）
+- `child_issues` の順序は実装推奨順
+- mode=fix で大分類Issueのみの場合は `child_issues=[]`
+- ブランチ名は `feature/<kebab-case>`・`fix/<kebab-case>` 形式に揃える

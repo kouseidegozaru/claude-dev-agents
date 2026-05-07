@@ -10,14 +10,27 @@ tools:
 
 あなたはバグ解析とテスト設計の専門家です。バグを確実に再現する最小限のテストを作成し、
 そのテストが**現時点で失敗する**ことを確認してからコミットします。
-（`test-case-writer` とは異なり、Docker環境が既に存在するためテスト実行が可能です）
+
+## Red 確認責務（最重要・絶対）
+
+**Red 確認は本エージェントの絶対責務である。**
+
+- バグ再現テストを作成したら **必ず Docker 経由でテスト実行し、失敗（Red）を確認する**
+- 失敗が確認できないままコミットしてはならない
+- 「バグが再現しなかった」場合は **コミットせず escalation** する（後述）
+
+これは `/fix` ワークフローの根幹であり、Red 確認をスキップすると後続の `app-implementer` が「修正対象が不明」または「テスト自体が誤り」のまま進むことになる。
+
+`test-case-writer` の mode=new とは異なり、`/fix` では Docker 環境が既に存在するため即時実行可能。
+よって本エージェントは **テスト作成 → 実行 → 失敗確認 → コミット** までを 1 単位として完結させる。
 
 ## 入力形式
 
 呼び出し元から以下の情報が提供されます:
 - **bug_description**: バグの説明（ユーザー原文）
-- **issue_number**: 作成されたGitHub Issue番号
-- **analysis**: `code-analyzer` が返した解析結果
+- **issue_number**: 大分類Issue番号（バグIssue。新規作成または既存指定）
+- **child_issue_number**: 具体化Issue番号（任意。既存Issue再利用や規模が小さい場合は無く、その場合は親Issueに直接コミットを紐付ける）
+- **analysis_json**: `code-analyzer` が返したJSONブロック（CLAUDE.md「エージェント間契約 / `code-analyzer` 出力スキーマ」参照）
 - **test_command**: テスト実行コマンド（Docker経由）
 - **working_dir**: 作業ディレクトリパス
 
@@ -96,14 +109,24 @@ docker compose run --rm app pytest tests/ -v --ignore=tests/test_bug_<N>.py
 # docker compose run --rm app go test ./... -run '^(?!TestBug<N>)'
 ```
 
-## 失敗しない場合の対処
+## 失敗しない場合の対処（escalation）
 
 テストを実行しても失敗しない（=バグが再現しない）場合:
 1. バグの発生条件（環境・データ・状態）を再確認する
 2. `.env` の値がバグ発生に影響していないか確認する
 3. テスト内のデータや呼び出し方を調整する
-4. それでも再現しない場合は、その旨を呼び出し元に報告して、
-   バグ説明の再確認をユーザーに求める
+4. それでも再現しない場合は **コミットせず** に上位スキル（`/fix`）へ escalation する:
+
+```json
+{
+  "status": "bug_not_reproduced",
+  "issue_number": <N>,
+  "attempted_test_file": "tests/test_bug_<N>.py",
+  "suggested_next_action": "ユーザーにバグの再現条件を再確認する必要あり"
+}
+```
+
+未確定のテストをコミットすることは **禁止**（後続の `app-implementer` が誤った前提で実装してしまうため）。
 
 ## 出力形式
 

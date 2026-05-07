@@ -111,10 +111,40 @@ fi
 
 ## 無限ループ防止
 
-同じエラーが **3回連続** で発生した場合:
-1. 現在の状況をまとめる
-2. 解決できない理由を分析
-3. 解決できない旨と詳細を呼び出し元に報告して終了
+以下のいずれかを満たした場合、**強制的にループを抜けて escalation する**。
+
+| 条件 | reason 値 |
+|---|---|
+| 同一エラーシグネチャが **3回連続** で発生（シグネチャ = テストファイル × テスト関数名 × エラー型） | `same_error_3_times` |
+| 総ループ回数が **8回** に達した（成否に関わらず） | `loop_limit_exceeded` |
+| 修正によってテスト通過数が **減少**（=回帰）した直後の試行で、再修正が同一ファイルを編集する | `regression_loop` |
+| mode=fix で修正対象が `affected_files` の範囲外へ拡散した | `scope_diffusion` |
+
+### escalation の手順
+
+1. 現在の状況をまとめる（失敗テスト一覧・直近の修正差分要約）
+2. CLAUDE.md「エージェント間契約 / `test-runner-fixer` escalation フォーマット」に従ったJSONを返す
+3. **コミット・PR作成は行わない**（中途半端な状態のコミットを避けるため）
+4. 上位スキルに制御を返す
+
+### escalation JSON 例
+
+```json
+{
+  "status": "unresolved",
+  "reason": "same_error_3_times",
+  "loop_count": 3,
+  "failing_tests": [
+    {
+      "file": "tests/test_auth.py",
+      "name": "test_token_expiry_utc",
+      "error_summary": "AssertionError: expected token valid, got invalid (UTC vs local)"
+    }
+  ],
+  "last_attempt_diff_summary": "src/services/auth.py L45 を datetime.utcnow() に変更したが、別箇所で local time が残存",
+  "suggested_next_action": "src/services/auth.py 全体の datetime 使用箇所を grep で洗い出して統一する必要あり"
+}
+```
 
 ## 修正ログ形式
 
@@ -137,7 +167,8 @@ docker compose down
 
 ## コミット
 
-全テスト通過後にバグ修正をコミット（Dockerファイルの修正も含める）:
+**全テスト通過時のみ** コミットする。escalation 時は **コミットしない**（中途半端な状態を残さない）。
+
 ```bash
 git add src/ Dockerfile docker-compose.yml   # テストファイルはaddしない
 git commit -m "fix: Fix test failures - <主な修正内容の概要>"
@@ -166,7 +197,7 @@ git commit -m "fix: Fix implementation for Issue #N"
 ### 最終コミット: abc1234
 ```
 
-失敗した場合:
+失敗した場合（escalation）:
 ```
 ## テスト結果サマリー（要対応）
 
@@ -176,4 +207,19 @@ git commit -m "fix: Fix implementation for Issue #N"
 - 解決できない理由: <説明>
 
 ### 通過済みテスト: N / M件
+
+### escalation JSON
+
+```json
+{
+  "status": "unresolved",
+  "reason": "same_error_3_times",
+  "loop_count": 3,
+  "failing_tests": [...],
+  "last_attempt_diff_summary": "...",
+  "suggested_next_action": "..."
+}
+```
+
+※ コミット・PR作成は行っていない（上位スキルが対応すること）
 ```

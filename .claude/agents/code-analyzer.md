@@ -90,6 +90,9 @@ gh issue list --state open --json number,title,labels | head -20
 
 ## 出力形式
 
+人間可読のMarkdownレポートに加え、**末尾に必ずJSONブロックを出力する**（CLAUDE.md「エージェント間契約」参照）。
+後続エージェント（issue-creator・docker-initializer・app-implementer・bug-reproducer・test-runner-fixer）はこのJSONを機械的にパースする。
+
 ```
 ## コードベース解析結果
 
@@ -118,8 +121,31 @@ tests/
 - 関連する既存テスト: tests/test_auth.py::test_token_validation（現在通過中 → バグをカバーしていない）
 
 ### 後続エージェントへの引き継ぎ情報
-- テスト実行コマンド: docker compose run --rm app pytest tests/ -v
-- docker-compose.yml: ./docker-compose.yml
-- 既存テストファイル: [tests/test_user.py, tests/test_auth.py]
-- 変更対象ファイル: [src/models/user.py, src/services/auth.py]
+
+```json
+{
+  "tech_stack": {
+    "language": "Python 3.11",
+    "framework": "FastAPI",
+    "test_framework": "pytest"
+  },
+  "test_command": "docker compose run --rm app pytest tests/ -v",
+  "compose_file": "./docker-compose.yml",
+  "existing_test_files": ["tests/test_user.py", "tests/test_auth.py"],
+  "existing_test_count": 13,
+  "affected_files": ["src/models/user.py", "src/services/auth.py"],
+  "bug_location": {
+    "file": "src/services/auth.py",
+    "line": 45,
+    "summary": "tokenの有効期限チェックがUTCではなくlocal timeで比較されている"
+  }
+}
 ```
+```
+
+### JSON出力のルール
+
+- `affected_files` は **常にPOSIX形式の相対パス文字列の配列**（絶対パス・バックスラッシュ禁止）
+- `bug_location` は **mode=fix のときのみ** 含める。mode=change では省略する
+- `existing_test_count` は `pytest --collect-only` 等の正確な集計値を入れる（推定値ではなく）
+- JSON ブロックが欠落・パース不能な場合、後続エージェントは作業を中断する。**フォーマット遵守は必須**
