@@ -8,9 +8,16 @@ Claude Code 上で動作する **TDD駆動・Docker実行・GitHub Issue管理**
 ## 取得方法
 
 ```bash
+# ダウンロード & 展開
 curl -L https://github.com/kouseidegozaru/claude-dev-agents/archive/refs/heads/main.tar.gz -o agents.tar.gz
 tar xzf agents.tar.gz
-# 取得した .claude/ と CLAUDE.md を対象プロジェクト直下に配置
+
+# 対象プロジェクト直下へ移動
+mv claude-dev-agents-main/.claude .
+mv claude-dev-agents-main/CLAUDE.md .
+
+# 不要ファイル削除
+rm -rf claude-dev-agents-main agents.tar.gz
 ```
 
 ---
